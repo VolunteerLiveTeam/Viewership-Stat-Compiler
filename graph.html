@@ -1,0 +1,47 @@
+<html>
+
+<head>
+    <script type="text/javascript" src="dygraph.js"></script>
+    <link rel="stylesheet" src="dygraph.css" />
+</head>
+<form>
+    CSV filename:
+    <br>
+    <input id="file" type="text" name="filename">
+</form>
+
+<body>
+    <div id="graphdiv"></div>
+    <div id="error"></div>
+    <script type="text/javascript">
+        function onKey(e) {
+            var csv = e.target.value;
+            if (e.keyCode === 13) {
+            try {
+                    e.preventDefault();
+                    g = new Dygraph(
+                        // containing div
+                        document.getElementById("graphdiv"),
+                        // CSV or path to a CSV file.
+                        csv,
+                    );
+            } catch (err) {
+                if (e instanceof TypeError) {
+                    var error = document.getElementById("error");
+                    div.textContent = "Error: your CSV is formatted incorrectly.";
+                    var text = div.textContent;
+                }
+                throw err; // the error is a different type, so we throw it again
+            }
+        }
+
+        }
+        document.getElementById('file').addEventListener('keypress', onKey)
+        // do stuff with (e) basically
+        // e.target will be the dom node, so
+        // you'll need to do all the stuff with csv in this function
+    </script>
+
+</body>
+
+</html>
