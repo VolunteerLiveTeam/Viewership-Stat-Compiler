@@ -31,6 +31,11 @@ aboutparsed = JSON.parse(aboutjson) # Parse lt info JSON
 wsurl = aboutparsed["data"]["websocket_url"] # Extract websocket_url from live thread info
 title = aboutparsed["data"]["title"] # Extract title of live thread
 
+if wsurl == nil # If there is no WebSocket URL
+  puts "The live thread is over, exiting." 
+  abort # Exit
+end
+
 puts "Found live thread with ID #{liveid} - \"#{title}\""
 
 if not File.file?("#{title}.csv") # If our CSV file doesn't exist
@@ -40,49 +45,52 @@ if not File.file?("#{title}.csv") # If our CSV file doesn't exist
 elsif File.file?("#{title}.csv") # Else, if file does exist
 end # Continue
 
-
-EM.run {
-  ws = Faye::WebSocket::Client.new(wsurl) # Start WebSocket client with WebSocket url
-  ws.onopen = lambda do |event| # Triggered when connection is open
-    puts "Opened connection"
-  end
-
-  ws.onclose = lambda do |close| # Triggered when connection is closed
-    p [:close, close.code, close.reason]
-    EM.stop
-  end
-
-  ws.onerror = lambda do |error| # Triggered when error occurs
-    p [:error, error.message]
-  end
-
-  ws.onmessage = lambda do |message| # Triggers when response is recieved
-    count = nil
-    time = Time.now.utc.strftime("%d/%m/%Y at %H:%M:%S")
-    csvtime = Time.now.utc.strftime("%H:%M:%S") # For Excel, etc.
-    csvdate = Time.now.utc.strftime("%Y-%m-%d") # For Excel, etc.
-    csvnow = Time.now.utc.strftime("%Y/%m/%d %k:%M:%S") # Correct CSV format for HTML CSV plotting (dygraphs)
-    incoming = JSON.parse(message.data) #hash of message (parsed JSON)
-    puts incoming
-    type = incoming["type"] # Look at incoming message's type
-    if type == "activity" # If message type is activity
-      puts "Recieved an activity message."
-      array = JSON.parse(message.data) # Parse message data as JSON
-      puts "Array: #{array}"
-      count = array["payload"]["count"] # Extract current viewer count from message data
-      puts "Number of viewers on #{time}: #{count}"
-      CSV.open("#{title}.csv", "a+") do |csv| # Open CSV file with title (from live thread info), write on new line
-        csv << [csvnow, count] # Write viewer count, current time, current date to csv
-        puts "Recorded to CSV, filename #{title}.csv"
-        break # Break out of CSV loop
-      end
-    elsif type == "complete" # If message type is complete, inform and abort
-      puts "#{time} - Thread is over, bye!"
-      abort
-    elsif type == "update" # If message type is update, inform and print message data
-      puts "Recieved an update"
-      p [:update, message.data]
+def start_connection(wsurl)
+  EM.run {
+    ws = Faye::WebSocket::Client.new(wsurl, ping: 60) # Start WebSocket client with WebSocket url
+    ws.onopen = lambda do |event| # Triggered when connection is open
+      puts "Opened connection"
     end
 
-  end
-}
+    ws.onclose = lambda do |close| # Triggered when connection is closed
+      p [:close, close.code, close.reason]
+      start_connection # Restart the connection
+    end
+
+    ws.onerror = lambda do |error| # Triggered when error occurs
+      p [:error, error.message]
+    end
+
+    ws.onmessage = lambda do |message| # Triggers when response is recieved
+      count = nil
+      time = Time.now.utc.strftime("%d/%m/%Y at %H:%M:%S")
+      csvtime = Time.now.utc.strftime("%H:%M:%S") # For Excel, etc.
+      csvdate = Time.now.utc.strftime("%Y-%m-%d") # For Excel, etc.
+      csvnow = Time.now.utc.strftime("%Y/%m/%d %k:%M:%S") # Correct CSV format for HTML CSV plotting (dygraphs)
+      incoming = JSON.parse(message.data) #hash of message (parsed JSON)
+      puts incoming
+      type = incoming["type"] # Look at incoming message's type
+      if type == "activity" # If message type is activity
+        puts "Recieved an activity message."
+        array = JSON.parse(message.data) # Parse message data as JSON
+        puts "Array: #{array}"
+        count = array["payload"]["count"] # Extract current viewer count from message data
+        puts "Number of viewers on #{time}: #{count}"
+        CSV.open("#{title}.csv", "a+") do |csv| # Open CSV file with title (from live thread info), write on new line
+          csv << [csvnow, count] # Write viewer count, current time, current date to csv
+          puts "Recorded to CSV, filename #{title}.csv"
+          break # Break out of CSV loop
+        end
+      elsif type == "complete" # If message type is complete, inform and abort
+        puts "#{time} - Thread is over, bye!"
+        abort
+      elsif type == "update" # If message type is update, inform and print message data
+        puts "Recieved an update"
+        p [:update, message.data]
+      end
+
+    end
+  }
+end
+
+start_connection(wsurl)
