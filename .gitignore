@@ -52,3 +52,4 @@ build-iPhoneSimulator/
 # to ignore Sublime project files
 *.sublime-project
 *.sublime-workspace
+*.csv
