@@ -3,9 +3,67 @@ require 'em/pure_ruby'
 require 'json'
 require 'csv'
 require 'open-uri'
+require 'rss'
+require 'nokogiri'
+require 'active_support/core_ext/enumerable'
 
-liveid = ARGV[0].to_s # Get user input, set as liveid
-abouturl = "http://www.reddit.com/live/#{liveid}/about.json" # Get url for live thread info
+feed = 'https://www.reddit.com/r/VolunteerLiveTeam/.rss' # /r/VolunteerLiveTeam RSS feed
+
+def search(array)
+  lastChecked = Time.now.to_f # Last time the threads were checked for a new one.
+  puts "Checked for new thread at #{Time.at(lastChecked).utc}"
+  array.each do |array| # For each
+    found = false
+    float = array[:float]
+    if float > lastChecked
+      found = true
+      puts "Found a new live thread."
+      return [found, array]
+    else
+      found = false
+      return found
+    end
+  end
+end
+
+def search_rss(feed)
+  rss = RSS::Parser.parse(feed)
+  array = []
+  rss.items.each do |item|
+    title = Nokogiri::HTML(item.title.to_s).xpath('/html/head/title').text
+    link = Nokogiri::HTML(item.link.to_s).css('link[href]').map { |link| link['href'] }
+    date = Nokogiri::HTML(item.updated.to_s).text
+    float = Time.parse(Nokogiri::HTML(date.to_s).text).to_f # Parse the time string as a time object, and convert to float
+    if not title.match(/\[live\] (.*)/)
+      next
+    else
+      h = {:title => title, :link => link.join(""), :date => date, :float => float}
+      array.push(h)
+    end
+  end
+  return array
+end
+
+
+while true
+  array = search_rss(feed) # Array of hashes of each [live] thread.
+  found = search(array) # Returns an array of a value and a hash (the live thread)
+  unless found # Unless found is truthy, do unless block. Otherwise, do else block.
+    puts "No new live threads found, sleeping 5 minutes and retrying."
+    sleep 300
+    redo
+  else
+  id = (found.grep(Hash).reduce)[:link].match(/comments\/(.*?)\//)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
+  title = found.grep(Hash).reduce[:title] # Grab the hash from the array, reduce to a hash and grab title element.
+    puts "ID for the new live thread is: #{id}"
+    puts "Title of the new live thread is \"#{title}\""
+    return id
+  end
+end
+
+#liveid = ARGV[0].to_s # Get user input, set as liveid
+
+abouturl = "http://www.reddit.com/live/#{id}/about.json" # Get url for live thread info
 tries = 0
 
 begin
@@ -36,7 +94,7 @@ if wsurl == nil # If there is no WebSocket URL
   abort # Exit
 end
 
-puts "Found live thread with ID #{liveid} - \"#{title}\""
+puts "Found live thread with ID #{id} - \"#{title}\""
 
 if not File.file?("#{title}.csv") # If our CSV file doesn't exist
   CSV.open("#{title}.csv", "a+") do |csv| # Open a new CSV file with title of live thread as filename
