@@ -27,7 +27,24 @@ def search(array)
 end
 
 def search_rss(feed)
-  rss = RSS::Parser.parse(feed)
+  tries = 0
+  begin
+    rss = RSS::Parser.parse(feed)
+  rescue OpenURI::HTTPError => error
+    tries += 1
+    if tries < 3
+      puts "#{error.message} - You'll most likely need to see here for the request rules: https://github.com/reddit/reddit/wiki/API/"
+      puts "Sleeping ten seconds and retrying, attempt #{tries}/3"
+      sleep(10)
+      retry
+    else
+      puts "Exiting after 3 attemps"
+      abort
+    end
+  rescue Exception => e
+    puts "Throw error's class was #{e.class}, message was #{e.message}"
+    raise e
+  end
   array = []
   rss.items.each do |item|
     title = Nokogiri::HTML(item.title.to_s).xpath('/html/head/title').text
@@ -53,8 +70,8 @@ while true
     sleep 300
     redo
   else
-  id = (found.grep(Hash).reduce)[:link].match(/comments\/(.*?)\//)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
-  title = found.grep(Hash).reduce[:title] # Grab the hash from the array, reduce to a hash and grab title element.
+    id = (found.grep(Hash).reduce)[:link].match(/comments\/(.*?)\//)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
+    title = found.grep(Hash).reduce[:title] # Grab the hash from the array, reduce to a hash and grab title element.
     puts "ID for the new live thread is: #{id}"
     puts "Title of the new live thread is \"#{title}\""
     return id
@@ -90,7 +107,7 @@ wsurl = aboutparsed["data"]["websocket_url"] # Extract websocket_url from live t
 title = aboutparsed["data"]["title"] # Extract title of live thread
 
 if wsurl == nil # If there is no WebSocket URL
-  puts "The live thread is over, exiting." 
+  puts "The live thread is over, exiting."
   abort # Exit
 end
 
