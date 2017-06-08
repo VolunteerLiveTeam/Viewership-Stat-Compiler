@@ -20,7 +20,7 @@ bundler install
 
 To use, simply do:
 ```
-ruby main.rb
+bundler exec ruby main.rb
 ```
 The script should start monitoring for new live threads on /r/VolunteerNewsTeam.
 
