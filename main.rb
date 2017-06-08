@@ -66,8 +66,8 @@ while true
   array = search_rss(feed) # Array of hashes of each [live] thread.
   found = search(array) # Returns an array of a value and a hash (the live thread)
   unless found # Unless found is truthy, do unless block. Otherwise, do else block.
-    puts "No new live threads found, sleeping 5 minutes and retrying."
-    sleep 300
+    puts "No new live threads found, sleeping 2 minutes and retrying."
+    sleep 120
     redo
   else
     id = (found.grep(Hash).reduce)[:link].match(/comments\/(.*?)\//)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
