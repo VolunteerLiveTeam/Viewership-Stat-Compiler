@@ -9,30 +9,50 @@ require 'active_support/core_ext/enumerable'
 require 'time'
 require 'net/http'
 
-=begin
-feed = 'https://www.reddit.com/r/VolunteerLiveTeam/.rss' # /r/VolunteerLiveTeam RSS feed
-
-def search(array)
-  lastChecked = Time.now.to_f # Last time the threads were checked for a new one.
+feed = "http://www.reddit.com/r/livetester5/.rss"
+lastChecked = Time.now.to_f
+now = Time.now.to_f
+def search(livethreads, lastChecked)
   puts "Checked for new thread at #{Time.at(lastChecked).utc}"
-  array.each do |array| # For each
+  now = Time.now.to_f
+  livethreads.each do |thread| # For each
     found = false
-    float = array[:float]
+    float = thread[:float]
     if float > lastChecked
       found = true
       puts "Found a new live thread."
-      return [found, array]
+      return [found, thread]
     else
       found = false
-      return [found, lastChecked]
+      return [found, now]
     end
   end
 end
 
 def search_rss(feed)
   tries = 0
+  rss = RSS::Parser.parse(feed)
+  array = []
+  rss.items.each do |item|
+    title = Nokogiri::HTML(item.title.to_s).xpath('/html/head/title').text
+    postlink = (Nokogiri::HTML(item.link.to_s).css('link[href]').map { |link| link['href'] })
+    postlinkjson = "#{postlink.join("")}about.json"
+    date = Nokogiri::HTML(item.updated.to_s).text
+    float = Time.parse(Nokogiri::HTML(date.to_s).text).to_f # Parse the time string as a time object, and convert to float
+    if not title.match(/\[live\] (.*)/)
+      next
+    else
+      h = {:title => title, :jsonlink => postlinkjson, :date => date, :float => float}
+      array.push(h)
+    end
+  end
+  return array
+end
+
+tries = 0
+while true
   begin
-    rss = RSS::Parser.parse(feed)
+    array = search_rss(feed) # Array of hashes of each [live] thread.
   rescue OpenURI::HTTPError => error
     tries += 1
     if tries < 3
@@ -48,46 +68,27 @@ def search_rss(feed)
     puts "Throw error's class was #{e.class}, message was #{e.message}"
     raise e
   end
-  array = []
-  rss.items.each do |item|
-    title = Nokogiri::HTML(item.title.to_s).xpath('/html/head/title').text
-    link = Nokogiri::HTML(item.link.to_s).css('link[href]').map { |link| link['href'] }
-    date = Nokogiri::HTML(item.updated.to_s).text
-    float = Time.parse(Nokogiri::HTML(date.to_s).text).to_f # Parse the time string as a time object, and convert to float
-    if not title.match(/\[live\] (.*)/)
-      next
-    else
-      h = {:title => title, :link => link.join(""), :date => date, :float => float}
-      array.push(h)
-    end
-  end
-  return array
-end
 
-
-while true
-  array = search_rss(feed) # Array of hashes of each [live] thread.
-  found = search(array)[0] # Returns an array of a value and a hash (the live thread)
-  lastChecked = search(array)[1]
+  found, lastChecked = search(array, lastChecked) # Returns an array of a value and a hash (the live thread)
   unless found # Unless found is truthy, do unless block. Otherwise, do else block.
     puts "No new live threads found, sleeping 2 minutes and retrying."
     sleep 120
     redo
   else
-    id = (found.grep(Hash).reduce)[:link].match(/comments\/(.*?)\//)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
-    title = found.grep(Hash).reduce[:title] # Grab the hash from the array, reduce to a hash and grab title element.
+  	threadlink = (JSON.parse(open(lastChecked[:jsonlink]).read))[0]["data"]["children"][0]["data"]["url"]
+    id = threadlink.match(/\/live\/(.*)/)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
+    title = lastChecked[:title] # Grab the hash from the array, reduce to a hash and grab title element. NOTE: WE ARE USING LASTCHECKED BECAUSE IT THE SECOND VALUE RETURNED. DON'T WORRY, IT WORKS.
     puts "ID for the new live thread is: #{id}"
     puts "Title of the new live thread is \"#{title}\""
-    return id
   end
-  return id
+  break
 end
-=end
 
-id = ARGV[0].to_s # Get user input, set as liveid
+#id = ARGV[0].to_s # Get user input, set as liveid
 abouturl = "http://www.reddit.com/live/#{id}/about.json" # Get url for live thread info
 tries = 0
 
+puts abouturl
 begin
   aboutjson = open(abouturl).read # Open live thread info JSON
 rescue OpenURI::HTTPError => error
@@ -182,6 +183,7 @@ def start_connection(url, id, title) # Define a new method for the WebSocket lis
     end
   }
 end
+
 while true # Set up a loop so when it fails, it can restart. We can probably just do this with activity pings (?)
   start_connection(wsurl, id, title)
 end
