@@ -9,7 +9,7 @@ require 'active_support/core_ext/enumerable'
 require 'time'
 require 'net/http'
 
-feed = "http://www.reddit.com/r/livetester5/.rss"
+feed = "http://www.reddit.com/r/VolunteerLiveTeam/.rss"
 lastChecked = Time.now.to_f
 now = Time.now.to_f
 def search(livethreads, lastChecked)
