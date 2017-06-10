@@ -6,7 +6,10 @@ require 'open-uri'
 require 'rss'
 require 'nokogiri'
 require 'active_support/core_ext/enumerable'
+require 'time'
+require 'net/http'
 
+=begin
 feed = 'https://www.reddit.com/r/VolunteerLiveTeam/.rss' # /r/VolunteerLiveTeam RSS feed
 
 def search(array)
@@ -21,7 +24,7 @@ def search(array)
       return [found, array]
     else
       found = false
-      return found
+      return [found, lastChecked]
     end
   end
 end
@@ -64,7 +67,8 @@ end
 
 while true
   array = search_rss(feed) # Array of hashes of each [live] thread.
-  found = search(array) # Returns an array of a value and a hash (the live thread)
+  found = search(array)[0] # Returns an array of a value and a hash (the live thread)
+  lastChecked = search(array)[1]
   unless found # Unless found is truthy, do unless block. Otherwise, do else block.
     puts "No new live threads found, sleeping 2 minutes and retrying."
     sleep 120
@@ -76,10 +80,11 @@ while true
     puts "Title of the new live thread is \"#{title}\""
     return id
   end
+  return id
 end
+=end
 
-#liveid = ARGV[0].to_s # Get user input, set as liveid
-
+id = ARGV[0].to_s # Get user input, set as liveid
 abouturl = "http://www.reddit.com/live/#{id}/about.json" # Get url for live thread info
 tries = 0
 
@@ -120,16 +125,17 @@ if not File.file?("#{title}.csv") # If our CSV file doesn't exist
 elsif File.file?("#{title}.csv") # Else, if file does exist
 end # Continue
 
-def start_connection(wsurl)
+def start_connection(url, id, title) # Define a new method for the WebSocket listener with URL, and pass the thread id and title into it
   EM.run {
-    ws = Faye::WebSocket::Client.new(wsurl, ping: 60) # Start WebSocket client with WebSocket url
+
+    ws = Faye::WebSocket::Client.new(url) # Start WebSocket client with WebSocket url
     ws.onopen = lambda do |event| # Triggered when connection is open
       puts "Opened connection"
     end
 
     ws.onclose = lambda do |close| # Triggered when connection is closed
       p [:close, close.code, close.reason]
-      start_connection # Restart the connection
+      start_connection(url) # Restart the connection
     end
 
     ws.onerror = lambda do |error| # Triggered when error occurs
@@ -141,6 +147,7 @@ def start_connection(wsurl)
       time = Time.now.utc.strftime("%d/%m/%Y at %H:%M:%S")
       csvtime = Time.now.utc.strftime("%H:%M:%S") # For Excel, etc.
       csvdate = Time.now.utc.strftime("%Y-%m-%d") # For Excel, etc.
+      postnow = Time.now.utc.iso8601
       csvnow = Time.now.utc.strftime("%Y/%m/%d %k:%M:%S") # Correct CSV format for HTML CSV plotting (dygraphs)
       incoming = JSON.parse(message.data) #hash of message (parsed JSON)
       puts incoming
@@ -151,10 +158,18 @@ def start_connection(wsurl)
         puts "Array: #{array}"
         count = array["payload"]["count"] # Extract current viewer count from message data
         puts "Number of viewers on #{time}: #{count}"
-        CSV.open("#{title}.csv", "a+") do |csv| # Open CSV file with title (from live thread info), write on new line
+        CSV.open("#{id}.csv", "a+") do |csv| # Open CSV file with title (from live thread ID), write on new line (a+)
           csv << [csvnow, count] # Write viewer count, current time, current date to csv
           puts "Recorded to CSV, filename #{title}.csv"
           break # Break out of CSV loop
+        end
+
+        posturl = URI("http://echelon.writhem.com/influx/?test") # Define the URL for our endpoint (not https)
+        postreq = Net::HTTP::Post.new(posturl, 'Content-Type' => 'application/json', 'API-Key' => '0629fdb9-2fdd-4f50-bec7-62862d3ea099') # Define our request URL and parameters
+        postreq.body = [{"tags":{"slug":id,"name":title},"fields":{"viewers":count},"timestamp":postnow}].to_json # Define the body of our message, convert to a JSON object
+        Net::HTTP.start(posturl.hostname, posturl.port) do |http| # Start request with hostname and port
+          res = http.request(postreq) # Do request
+          puts "#{res.body}" # Output the response
         end
       elsif type == "complete" # If message type is complete, inform and abort
         puts "#{time} - Thread is over, bye!"
@@ -167,5 +182,6 @@ def start_connection(wsurl)
     end
   }
 end
-
-start_connection(wsurl)
+while true # Set up a loop so when it fails, it can restart. We can probably just do this with activity pings (?)
+  start_connection(wsurl, id, title)
+end
