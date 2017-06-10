@@ -16,6 +16,12 @@ Then, in the repo folder, install the dependencies with:
 ```
 bundler install
 ```
+
+You'll need an API key from @pironic on the VolunteerLiveTeam Slack. Put it in a config.yaml file like so:
+```
+endpoint_key: <key>
+```
+With key obviously being your key, with no quotes.
 ## Usage
 
 To use, simply do:
