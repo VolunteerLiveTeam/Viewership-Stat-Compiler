@@ -165,7 +165,7 @@ def start_connection(url, id, title) # Define a new method for the WebSocket lis
           break # Break out of CSV loop
         end
 
-        posturl = URI("http://echelon.writhem.com/influx/?test") # Define the URL for our endpoint (not https)
+        posturl = URI("http://echelon.writhem.com/influx/") # Define the URL for our endpoint (not https)
         postreq = Net::HTTP::Post.new(posturl, 'Content-Type' => 'application/json', 'API-Key' => '0629fdb9-2fdd-4f50-bec7-62862d3ea099') # Define our request URL and parameters
         postreq.body = [{"tags":{"slug":id,"name":title},"fields":{"viewers":count},"timestamp":postnow}].to_json # Define the body of our message, convert to a JSON object
         Net::HTTP.start(posturl.hostname, posturl.port) do |http| # Start request with hostname and port
