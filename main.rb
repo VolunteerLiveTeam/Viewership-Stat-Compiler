@@ -80,7 +80,7 @@ while true
     redo
   else
   	threadlink = (JSON.parse(open(lastChecked[:jsonlink]).read))[0]["data"]["children"][0]["data"]["url"]
-    id = threadlink.match(/\/live\/(.*)/)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
+    id = threadlink.match(/\/live\/(.*)\//)[1] # Grab the hash from the array, reduce to a hash and grab the link element. Then match to get the ID.
     title = lastChecked[:title] # Grab the hash from the array, reduce to a hash and grab title element. NOTE: WE ARE USING LASTCHECKED BECAUSE IT THE SECOND VALUE RETURNED. DON'T WORRY, IT WORKS.
     puts "ID for the new live thread is: #{id}"
     puts "Title of the new live thread is \"#{title}\""
@@ -161,7 +161,7 @@ def start_connection(url, id, title) # Define a new method for the WebSocket lis
         puts "Recieved an activity message."
         array = JSON.parse(message.data) # Parse message data as JSON
         puts "Array: #{array}"
-        count = array["payload"]["count"] # Extract current viewer count from message data
+        count = array["payload"]["count"].to_i # Extract current viewer count from message data
         puts "Number of viewers on #{time}: #{count}"
         CSV.open("#{id}.csv", "a+") do |csv| # Open CSV file with title (from live thread ID), write on new line (a+)
           csv << [csvnow, count] # Write viewer count, current time, current date to csv
