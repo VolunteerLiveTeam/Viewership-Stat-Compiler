@@ -53,8 +53,8 @@ def search_rss(feed)
   return array
 end
 
-tries = 0
 while true
+  tries = 0
   begin
     array = search_rss(feed) # Array of hashes of each [live] thread.
   rescue OpenURI::HTTPError => error
