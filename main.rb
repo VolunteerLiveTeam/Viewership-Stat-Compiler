@@ -35,7 +35,7 @@ end
 
 def search_rss(feed)
   tries = 0
-  rss = RSS::Parser.parse(feed)
+  rss = RSS::Parser.parse open(feed,  "User-Agent" => "desktop:com.camr12.viewerstats:v1.0.0 (by /u/everyboysfantasy)")
   array = []
   rss.items.each do |item|
     title = Nokogiri::HTML(item.title.to_s).xpath('/html/head/title').text
