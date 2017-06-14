@@ -159,7 +159,7 @@ def self.start_connection(url, id, title, key) # Define a new method for the Web
         abort
       elsif type == "update" # If message type is update, inform and print message data
         puts "Recieved an update"
-        p [:update, message.data]
+        #p [:update, message.data]
       end
 
     end
